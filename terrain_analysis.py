@@ -34,7 +34,19 @@ def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
 
 
 def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
-    return
+    """Build a labelled training dataframe from raster values at sample points."""
+    # Sample each raster layer at the same points for the classifier inputs.
+    data = {
+        "elev": extract_values_from_raster(topo, shapes),
+        "fault": extract_values_from_raster(dist_fault, shapes),
+        "slope": extract_values_from_raster(slope, shapes),
+        "LC": extract_values_from_raster(lc, shapes),
+        "Geol": extract_values_from_raster(geo, shapes),
+        "ls": landslide_label,
+    }
+
+    # Remove samples with missing raster data before training the model.
+    return pd.DataFrame(data).dropna()
 
 def reproject_to_match(in_raster, template_raster):
     """Reproject and resample a raster to match a template raster."""
