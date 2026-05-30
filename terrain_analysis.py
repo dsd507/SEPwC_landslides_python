@@ -26,7 +26,26 @@ def extract_values_from_raster(da, shapes):
     
 
 def make_classifier(x, y, verbose=False):
-    return
+    """Train a random forest classifier."""
+    # Split the labelled data so the model can be checked on unseen samples.
+    features_train, features_test, labels_train, labels_test = train_test_split(
+        x,
+        y,
+        test_size=0.25,
+        random_state=42,
+        stratify=y,
+    )
+
+    # Fit the random forest using the training samples.
+    classifier = RandomForestClassifier(n_estimators=100, random_state=42)
+    classifier.fit(features_train, labels_train)
+
+    if verbose:
+        predictions = classifier.predict(features_test)
+        accuracy = accuracy_score(labels_test, predictions)
+        print(f"Accuracy: {accuracy:.3f}")
+
+    return classifier
 
 
 def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
