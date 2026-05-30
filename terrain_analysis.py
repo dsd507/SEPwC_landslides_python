@@ -31,7 +31,8 @@ def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
     return
 
 def reproject_to_match(in_raster, template_raster):
-    return
+    """Reproject and resample a raster to match a template raster."""
+    return in_raster.rio.reproject_match(template_raster)
 
 
 def calculate_distance_to_faults(fault_shapefile, template_raster):
