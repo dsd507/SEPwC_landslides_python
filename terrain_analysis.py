@@ -16,7 +16,13 @@ from xrspatial import slope as xr_slope
 from xrspatial import proximity as xr_proximity
 
 def extract_values_from_raster(da, shapes):
-    return
+    """Extract raster values that are nearest to input point geometries."""
+    # Extract x and y coordinates from the input point geometries.
+    x_coords = xr.DataArray([geom.x for geom in shapes], dims="points")
+    y_coords = xr.DataArray([geom.y for geom in shapes], dims="points")
+    # Sample one raster value per point for the training dataframe.
+    values = da.sel(x=x_coords, y=y_coords, method="nearest").values
+    return np.asarray(values).ravel()
     
 
 def make_classifier(x, y, verbose=False):
