@@ -16,15 +16,15 @@ import xarray as xr
 from xrspatial import slope as xr_slope
 from xrspatial import proximity as xr_proximity
 
+
 def extract_values_from_raster(da, shapes):
     """Extract raster values that are nearest to input point geometries."""
-    # Extract x and y coordinates from the input point geometries.
     x_coords = xr.DataArray([geom.x for geom in shapes], dims="points")
     y_coords = xr.DataArray([geom.y for geom in shapes], dims="points")
     # Sample one raster value per point for the training dataframe.
     values = da.sel(x=x_coords, y=y_coords, method="nearest").values
-    return np.asarray(values).ravel()
-    
+    return values.ravel()
+
 
 def make_classifier(x, y, verbose=False):
     """Train a random forest classifier."""
@@ -37,7 +37,6 @@ def make_classifier(x, y, verbose=False):
         stratify=y,
     )
 
-    # Fit the random forest using the training samples.
     classifier = RandomForestClassifier(n_estimators=100, random_state=42)
     classifier.fit(features_train, labels_train)
 
@@ -51,13 +50,15 @@ def make_classifier(x, y, verbose=False):
 
 def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
     """Predict landslide probabilities for the raster grid."""
+    # Needs every raster layer to build the inputs, so it has a few extra arguments.
+    # pylint: disable=too-many-arguments, too-many-positional-arguments.
     # Build classifier inputs for every cell using the same columns as training.
     cell_features = pd.DataFrame({
-        "elev": np.asarray(topo.values).ravel(),
-        "fault": np.asarray(dist_fault.values).ravel(),
-        "slope": np.asarray(slope.values).ravel(),
-        "LC": np.asarray(lc.values).ravel(),
-        "Geol": np.asarray(geo.values).ravel(),
+        "elev": topo.values.ravel(),
+        "fault": dist_fault.values.ravel(),
+        "slope": slope.values.ravel(),
+        "LC": lc.values.ravel(),
+        "Geol": geo.values.ravel(),
     })
 
     # Only classify cells that have data in every layer.
@@ -71,6 +72,8 @@ def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
 
 def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
     """Build a labelled training dataframe from raster values at sample points."""
+    # The tests call this with a set list of arguments, so it goes over the limit.
+    # pylint: disable=too-many-arguments, too-many-positional-arguments.
     # Sample each raster layer at the same points for the classifier inputs.
     data = {
         "elev": extract_values_from_raster(topo, shapes),
@@ -83,6 +86,7 @@ def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
 
     # Remove samples with missing raster data before training the model.
     return pd.DataFrame(data).dropna()
+
 
 def reproject_to_match(in_raster, template_raster):
     """Reproject and resample a raster to match a template raster."""
@@ -109,7 +113,22 @@ def calculate_distance_to_faults(fault_shapefile, template_raster):
     return xr_proximity(fault_grid, target_values=[1])
 
 
+def make_background_points(template_raster, count):
+    """Create random background points within the raster extent."""
+    # Use the raster bounds so the points fall inside the study area.
+    minx, miny, maxx, maxy = template_raster.rio.bounds()
+    np.random.seed(42)
+    sample_x = np.random.uniform(minx, maxx, count)
+    sample_y = np.random.uniform(miny, maxy, count)
+    return gpd.GeoSeries(
+        [Point(x, y) for x, y in zip(sample_x, sample_y)],
+        crs=template_raster.rio.crs)
+
+
 def main(args_list=None):
+    """Run the landslide hazard model."""
+    # main runs the whole pipeline, so it uses more local variables than the limit.
+    # pylint: disable=too-many-locals
     parser = argparse.ArgumentParser(
         prog="Landslide hazard using ML",
         description="Calculate landslide hazards using machine learning"
@@ -121,7 +140,6 @@ def main(args_list=None):
     parser.add_argument("landslides", help="landslide location shapefile")
     parser.add_argument("output", help="output probability raster file")
     parser.add_argument('-v', '--verbose', action='store_true', help="Print progress")
-    
     args = parser.parse_args(args_list)
 
     # Topography sets the grid that every other layer is matched against.
@@ -142,15 +160,11 @@ def main(args_list=None):
 
     # Landslide locations are the positive examples for the classifier.
     landslides = gpd.read_file(args.landslides).to_crs(topo.rio.crs)
-    positive_samples = create_dataframe(topo, geo, lc, dist_fault, slope, landslides.geometry.centroid, 1)
+    positive_samples = create_dataframe(
+        topo, geo, lc, dist_fault, slope, landslides.geometry.centroid, 1)
 
     # Match those with the same number of random points as negative examples.
-    minx, miny, maxx, maxy = topo.rio.bounds()
-    np.random.seed(42)
-    sample_x = np.random.uniform(minx, maxx, len(landslides))
-    sample_y = np.random.uniform(miny, maxy, len(landslides))
-    background_points = gpd.GeoSeries(
-        [Point(x, y) for x, y in zip(sample_x, sample_y)], crs=topo.rio.crs)
+    background_points = make_background_points(topo, len(landslides))
     negative_samples = create_dataframe(topo, geo, lc, dist_fault, slope, background_points, 0)
 
     # Combine both sets and fit the random forest.
@@ -178,6 +192,7 @@ def main(args_list=None):
         transform=topo.rio.transform(),
     ) as output_raster:
         output_raster.write(probability_values, 1)
+
 
 if __name__ == '__main__':
     main()
