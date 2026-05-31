@@ -49,6 +49,8 @@ def make_classifier(x, y, verbose=False):
 
 def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
     """Predict landslide probabilities for the raster grid."""
+    # Needs every raster layer to build the inputs, so it has a few extra arguments.
+    # pylint: disable=too-many-arguments, too-many-positional-arguments.
     # Build classifier inputs for every cell using the same columns as training.
     cell_features = pd.DataFrame({
         "elev": topo.values.ravel(),
@@ -69,6 +71,8 @@ def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
 
 def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
     """Build a labelled training dataframe from raster values at sample points."""
+    # The tests call this with a set list of arguments, so it goes over the limit.
+    # pylint: disable=too-many-arguments, too-many-positional-arguments.
     # Sample each raster layer at the same points for the classifier inputs.
     data = {
         "elev": extract_values_from_raster(topo, shapes),
@@ -122,6 +126,8 @@ def make_background_points(template_raster, count):
 
 def main(args_list=None):
     """Run the landslide hazard model."""
+    # main runs the whole pipeline, so it uses more local variables than the limit.
+    # pylint: disable=too-many-locals
     parser = argparse.ArgumentParser(
         prog="Landslide hazard using ML",
         description="Calculate landslide hazards using machine learning"
