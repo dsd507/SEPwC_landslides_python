@@ -11,6 +11,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 import rioxarray
 import rasterio
+from rasterio.features import rasterize
 import xarray as xr
 from xrspatial import slope as xr_slope
 from xrspatial import proximity as xr_proximity
@@ -73,7 +74,23 @@ def reproject_to_match(in_raster, template_raster):
 
 
 def calculate_distance_to_faults(fault_shapefile, template_raster):
-    return
+    """Calculate distance to the nearest fault on the template raster grid."""
+    faults = gpd.read_file(fault_shapefile)
+    faults = faults.to_crs(template_raster.rio.crs)
+
+    # Turn the fault lines into a raster mask on the same grid as the template.
+    fault_mask = rasterize(
+        [(geometry, 1) for geometry in faults.geometry],
+        out_shape=template_raster.shape,
+        transform=template_raster.rio.transform(),
+        fill=0,
+        dtype="uint8",
+    )
+
+    fault_grid = template_raster.copy(data=fault_mask)
+
+    # Measure distance from every cell to the nearest fault cell.
+    return xr_proximity(fault_grid, target_values=[1])
 
 
 def main(args_list=None):
