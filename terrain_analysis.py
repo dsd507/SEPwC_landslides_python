@@ -24,6 +24,7 @@ def extract_values_from_raster(da, shapes):
     values = da.sel(x=x_coords, y=y_coords, method="nearest").values
     return values.ravel()
 
+
 def make_classifier(x, y, verbose=False):
     """Train a random forest classifier."""
     # Split the labelled data so the model can be checked on unseen samples.
@@ -81,6 +82,7 @@ def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
     # Remove samples with missing raster data before training the model.
     return pd.DataFrame(data).dropna()
 
+
 def reproject_to_match(in_raster, template_raster):
     """Reproject and resample a raster to match a template raster."""
     return in_raster.rio.reproject_match(template_raster)
@@ -104,6 +106,18 @@ def calculate_distance_to_faults(fault_shapefile, template_raster):
 
     # Measure distance from every cell to the nearest fault cell.
     return xr_proximity(fault_grid, target_values=[1])
+
+
+def make_background_points(template_raster, count):
+    """Create random background points within the raster extent."""
+    # Use the raster bounds so the points fall inside the study area.
+    minx, miny, maxx, maxy = template_raster.rio.bounds()
+    np.random.seed(42)
+    sample_x = np.random.uniform(minx, maxx, count)
+    sample_y = np.random.uniform(miny, maxy, count)
+    return gpd.GeoSeries(
+        [Point(x, y) for x, y in zip(sample_x, sample_y)],
+        crs=template_raster.rio.crs)
 
 
 def main(args_list=None):
@@ -143,12 +157,7 @@ def main(args_list=None):
         topo, geo, lc, dist_fault, slope, landslides.geometry.centroid, 1)
 
     # Match those with the same number of random points as negative examples.
-    minx, miny, maxx, maxy = topo.rio.bounds()
-    np.random.seed(42)
-    sample_x = np.random.uniform(minx, maxx, len(landslides))
-    sample_y = np.random.uniform(miny, maxy, len(landslides))
-    background_points = gpd.GeoSeries(
-        [Point(x, y) for x, y in zip(sample_x, sample_y)], crs=topo.rio.crs)
+    background_points = make_background_points(topo, len(landslides))
     negative_samples = create_dataframe(topo, geo, lc, dist_fault, slope, background_points, 0)
 
     # Combine both sets and fit the random forest.
