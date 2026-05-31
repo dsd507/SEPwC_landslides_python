@@ -50,7 +50,23 @@ def make_classifier(x, y, verbose=False):
 
 
 def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
-    return
+    """Predict landslide probabilities for the raster grid."""
+    # Build classifier inputs for every cell using the same columns as training.
+    cell_features = pd.DataFrame({
+        "elev": np.asarray(topo.values).ravel(),
+        "fault": np.asarray(dist_fault.values).ravel(),
+        "slope": np.asarray(slope.values).ravel(),
+        "LC": np.asarray(lc.values).ravel(),
+        "Geol": np.asarray(geo.values).ravel(),
+    })
+
+    # Only classify cells that have data in every layer.
+    complete_cells = ~cell_features.isna().any(axis=1)
+    probability_values = np.zeros(len(cell_features))
+    probability_values[complete_cells] = classifier.predict_proba(
+        cell_features.loc[complete_cells]
+    )[:, 1]
+    return probability_values.reshape(topo.shape)
 
 
 def create_dataframe(topo, geo, lc, dist_fault, slope, shapes, landslide_label):
