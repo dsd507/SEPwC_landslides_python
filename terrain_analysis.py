@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import box
+from shapely.geometry import Point
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -124,6 +124,60 @@ def main(args_list=None):
     
     args = parser.parse_args(args_list)
 
+    # Topography sets the grid that every other layer is matched against.
+    topo = rioxarray.open_rasterio(args.topography, masked=True).squeeze()
+
+    # Geology and landcover are snapped to that grid so the layers stack cleanly.
+    geo = reproject_to_match(
+        rioxarray.open_rasterio(args.geology, masked=True).squeeze(), topo)
+    lc = reproject_to_match(
+        rioxarray.open_rasterio(args.landcover, masked=True).squeeze(), topo)
+
+    # Slope and distance to faults are derived from the topography.
+    slope = xr_slope(topo)
+    dist_fault = calculate_distance_to_faults(args.faults, topo)
+
+    if args.verbose:
+        print("Loaded rasters and derived slope and fault distance.")
+
+    # Landslide locations are the positive examples for the classifier.
+    landslides = gpd.read_file(args.landslides).to_crs(topo.rio.crs)
+    positive_samples = create_dataframe(topo, geo, lc, dist_fault, slope, landslides.geometry.centroid, 1)
+
+    # Match those with the same number of random points as negative examples.
+    minx, miny, maxx, maxy = topo.rio.bounds()
+    np.random.seed(42)
+    sample_x = np.random.uniform(minx, maxx, len(landslides))
+    sample_y = np.random.uniform(miny, maxy, len(landslides))
+    background_points = gpd.GeoSeries(
+        [Point(x, y) for x, y in zip(sample_x, sample_y)], crs=topo.rio.crs)
+    negative_samples = create_dataframe(topo, geo, lc, dist_fault, slope, background_points, 0)
+
+    # Combine both sets and fit the random forest.
+    training_data = pd.concat([positive_samples, negative_samples])
+    classifier = make_classifier(
+        training_data.drop("ls", axis=1), training_data["ls"],
+        verbose=args.verbose)
+
+    # Run the trained model over every cell to get a probability grid.
+    probability_values = make_prob_raster_data(
+        topo, geo, lc, dist_fault, slope, classifier)
+
+    if args.verbose:
+        print("Writing probability raster to " + args.output)
+
+    # Save the result as a single band raster on the topography grid.
+    with rasterio.open(
+        args.output, "w",
+        driver="GTiff",
+        height=probability_values.shape[0],
+        width=probability_values.shape[1],
+        count=1,
+        dtype=probability_values.dtype,
+        crs=topo.rio.crs,
+        transform=topo.rio.transform(),
+    ) as output_raster:
+        output_raster.write(probability_values, 1)
 
 if __name__ == '__main__':
     main()
