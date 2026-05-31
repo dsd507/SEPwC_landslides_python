@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import matplotlib.pyplot as plt
 from shapely.geometry import Point
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
@@ -140,6 +141,7 @@ def main(args_list=None):
     parser.add_argument("landslides", help="landslide location shapefile")
     parser.add_argument("output", help="output probability raster file")
     parser.add_argument('-v', '--verbose', action='store_true', help="Print progress")
+    parser.add_argument('--plot', help="save a plot of the risk map to this image file")
     args = parser.parse_args(args_list)
 
     # Topography sets the grid that every other layer is matched against.
@@ -192,6 +194,15 @@ def main(args_list=None):
         transform=topo.rio.transform(),
     ) as output_raster:
         output_raster.write(probability_values, 1)
+
+    # Optionally save an image of the risk map.
+    if args.plot:
+        probability_da = topo.copy(data=probability_values)
+        probability_da.plot(cmap="viridis")
+        plt.title("Landslide hazard probability")
+        plt.savefig(args.plot)
+        if args.verbose:
+            print("Saved risk map to " + args.plot)
 
 
 if __name__ == '__main__':
