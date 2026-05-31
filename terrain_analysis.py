@@ -18,7 +18,6 @@ from xrspatial import proximity as xr_proximity
 
 def extract_values_from_raster(da, shapes):
     """Extract raster values that are nearest to input point geometries."""
-    # Extract x and y coordinates from the input point geometries.
     x_coords = xr.DataArray([geom.x for geom in shapes], dims="points")
     y_coords = xr.DataArray([geom.y for geom in shapes], dims="points")
     # Sample one raster value per point for the training dataframe.
@@ -37,7 +36,6 @@ def make_classifier(x, y, verbose=False):
         stratify=y,
     )
 
-    # Fit the random forest using the training samples.
     classifier = RandomForestClassifier(n_estimators=100, random_state=42)
     classifier.fit(features_train, labels_train)
 
@@ -110,6 +108,7 @@ def calculate_distance_to_faults(fault_shapefile, template_raster):
 
 
 def main(args_list=None):
+    """Run the landslide hazard model."""
     parser = argparse.ArgumentParser(
         prog="Landslide hazard using ML",
         description="Calculate landslide hazards using machine learning"
