@@ -23,7 +23,6 @@ def extract_values_from_raster(da, shapes):
     # Sample one raster value per point for the training dataframe.
     values = da.sel(x=x_coords, y=y_coords, method="nearest").values
     return values.ravel()
-    
 
 def make_classifier(x, y, verbose=False):
     """Train a random forest classifier."""
@@ -120,7 +119,6 @@ def main(args_list=None):
     parser.add_argument("landslides", help="landslide location shapefile")
     parser.add_argument("output", help="output probability raster file")
     parser.add_argument('-v', '--verbose', action='store_true', help="Print progress")
-    
     args = parser.parse_args(args_list)
 
     # Topography sets the grid that every other layer is matched against.
@@ -141,7 +139,8 @@ def main(args_list=None):
 
     # Landslide locations are the positive examples for the classifier.
     landslides = gpd.read_file(args.landslides).to_crs(topo.rio.crs)
-    positive_samples = create_dataframe(topo, geo, lc, dist_fault, slope, landslides.geometry.centroid, 1)
+    positive_samples = create_dataframe(
+        topo, geo, lc, dist_fault, slope, landslides.geometry.centroid, 1)
 
     # Match those with the same number of random points as negative examples.
     minx, miny, maxx, maxy = topo.rio.bounds()
