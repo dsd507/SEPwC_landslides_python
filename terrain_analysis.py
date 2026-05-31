@@ -23,7 +23,7 @@ def extract_values_from_raster(da, shapes):
     y_coords = xr.DataArray([geom.y for geom in shapes], dims="points")
     # Sample one raster value per point for the training dataframe.
     values = da.sel(x=x_coords, y=y_coords, method="nearest").values
-    return np.asarray(values).ravel()
+    return values.ravel()
     
 
 def make_classifier(x, y, verbose=False):
@@ -53,11 +53,11 @@ def make_prob_raster_data(topo, geo, lc, dist_fault, slope, classifier):
     """Predict landslide probabilities for the raster grid."""
     # Build classifier inputs for every cell using the same columns as training.
     cell_features = pd.DataFrame({
-        "elev": np.asarray(topo.values).ravel(),
-        "fault": np.asarray(dist_fault.values).ravel(),
-        "slope": np.asarray(slope.values).ravel(),
-        "LC": np.asarray(lc.values).ravel(),
-        "Geol": np.asarray(geo.values).ravel(),
+        "elev": topo.values.ravel(),
+        "fault": dist_fault.values.ravel(),
+        "slope": slope.values.ravel(),
+        "LC": lc.values.ravel(),
+        "Geol": geo.values.ravel(),
     })
 
     # Only classify cells that have data in every layer.
