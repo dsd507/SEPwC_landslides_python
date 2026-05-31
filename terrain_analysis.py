@@ -1,5 +1,7 @@
 """
 Calculate hazard risk of probability for landslides
+
+Copyright 2026 by Dhian Dhanoa. MIT.
 """
 import argparse
 import numpy as np
