@@ -16,6 +16,7 @@ import xarray as xr
 from xrspatial import slope as xr_slope
 from xrspatial import proximity as xr_proximity
 
+
 def extract_values_from_raster(da, shapes):
     """Extract raster values that are nearest to input point geometries."""
     x_coords = xr.DataArray([geom.x for geom in shapes], dims="points")
@@ -191,6 +192,7 @@ def main(args_list=None):
         transform=topo.rio.transform(),
     ) as output_raster:
         output_raster.write(probability_values, 1)
+
 
 if __name__ == '__main__':
     main()
